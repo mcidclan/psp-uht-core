@@ -1,5 +1,5 @@
 // m-c/d
-#include "uht.h"
+#include "Uht.h"
 
 Uht *Uht::myUhtPt;
 
@@ -61,12 +61,12 @@ void Uht::setMaxMrg(const u8 xMrg, const u8 yMrg){
 void Uht::initBuffer(void *bWork, const bool dRender, const bool fb565){
   this->fb565 = fb565;
   u32 ptValue = (u32)bWork;
-  xCont       = (u8*)  (ptValue);
-  yCont       = (u8*)  (ptValue + 0x000C0);
-  FB_565      = (u16*)(ptValue + 0x00140);
-  B_WORK      = (u8*)  (ptValue + 0x09740);
-  FB_8888     = (u32*)(ptValue + 0x0E240);
-  FB_MPEG     = dRender ? FB_8888 : (u32*)(ptValue + 0x20E40);
+  xCont = (u8*)  (ptValue);
+  yCont = (u8*)  (ptValue + 0x000C0);
+  FB_565 = (u16*)(ptValue + 0x00140);
+  B_WORK = (u8*)  (ptValue + 0x09740);
+  FB_8888 = (u32*)(ptValue + 0x0E240);
+  FB_MPEG = dRender ? FB_8888 : (u32*)(ptValue + 0x20E40);
 }
 
 int Uht::initCam(const u8 prop){
@@ -80,12 +80,12 @@ int Uht::initCam(const u8 prop){
   return 1;
 }
 
-int Uht::video_thread(SceSize args, void *argp){
+int Uht::video_thread(SceSize args, void *argp){  
   myUhtPt->internalThread(args, argp);
   return 1;
 }
 
-int Uht::internalThread(SceSize args, void *argp) {
+int Uht::internalThread(SceSize args, void *argp){
   u8 i = 0;
   PspUsbCamSetupVideoParam videoparam;
   memset(&videoparam, 0, sizeof(videoparam));
@@ -93,8 +93,8 @@ int Uht::internalThread(SceSize args, void *argp) {
   videoparam.resolution = PSP_USBCAM_RESOLUTION_160_120;
   videoparam.framerate = PSP_USBCAM_FRAMERATE_30_FPS;
   videoparam.saturation = 252;
-  videoparam.brightness = 138;
-  videoparam.contrast = 62;
+  videoparam.brightness = 138; // 152;
+  videoparam.contrast = 62; // 76;
   videoparam.framesize = MAX_VIDEO_FRAME_SIZE;
   videoparam.unk = 1;
   videoparam.evlevel = PSP_USBCAM_EVLEVEL_0_0;
@@ -105,16 +105,23 @@ int Uht::internalThread(SceSize args, void *argp) {
       sceKernelDelayThread(1000);
     }
     result = sceUsbCamSetupVideo(&videoparam, work, sizeof(work));
-    if (result < 0) goto out_2;
+    if (result < 0) {
+      run = false;
+      continue;
+    }
     sceUsbCamAutoImageReverseSW(1);
     result = sceUsbCamStartVideo();
-    if (result < 0) goto out_2;
+    if (result < 0) {
+      run = false;
+      continue;
+    }
     while(1){
       u8 outOfUsb = 0;
       direction = sceUsbCamGetLensDirection();
       while((result = sceUsbCamReadVideoFrameBlocking(buffer, MAX_VIDEO_FRAME_SIZE)) < 0){
-        outOfUsb += 1;
-        if(outOfUsb > 10) goto out_1;
+        if(++outOfUsb > 10) {
+          goto out_of_usb;
+        }
       };
       sceKernelDcacheWritebackAll();
       result = sceJpegDecodeMJpeg(buffer, result, FB_MPEG, 0);
@@ -151,11 +158,9 @@ int Uht::internalThread(SceSize args, void *argp) {
         semaState = false;
       }
     }
-    out_1:
+    out_of_usb:
       if(wFSignalSema) sceKernelSignalSema(semaid, 1);
       sceUsbCamStopVideo();
-    out_2:
-      run = false;
   }
   return 0;
 }
@@ -163,14 +168,12 @@ int Uht::internalThread(SceSize args, void *argp) {
 void Uht::convertBto565(){
   u32 in;
   u8 r, v, b;
-  
   u16 i = 0;
   while(i<SIZE_FBu8){
     in = FB_8888[i];
     r = ((u8)(in>>3)) & 0b11111;
     v = (u8)(in>>10);
     b = (u8)(in>>19);
-    
     FB_565[i] = r|(v<<5)|(b<<11);
     i++;
   }
@@ -207,16 +210,14 @@ void Uht::StopUsb(){
   sceUsbStop(PSP_USBCAMMIC_DRIVERNAME, 0, 0);
   sceUsbStop(PSP_USBCAM_DRIVERNAME, 0, 0);
   sceUsbStop(PSP_USBACC_DRIVERNAME, 0, 0);
-  //sceUsbStop(PSP_USBBUS_DRIVERNAME, 0, 0);
+  // sceUsbStop(PSP_USBBUS_DRIVERNAME, 0, 0);
 }
 
 int Uht::FinishJpegDecoder(){
   int result = sceJpegDeleteMJpeg();
   if (result < 0) return result;
-
   result = sceJpegFinishMJpeg();
   if (result < 0) return result;
-  
   return result;
 }
 

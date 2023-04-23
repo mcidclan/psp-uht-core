@@ -3,17 +3,19 @@
 
 #define W_ 160
 #define H_ 120
+
 static const u8 W2 = W_/2;
 static const u8 H2 = H_/2;
 
 void YCbCr(const u32* in, u8* out, const u16 size, const u8 margRB, const u8 tn){
-  u16 i = 0;
   u8 Cb, Cr, Y;
   u8 r, v, b;
   u32 val;
   float f_1;
   bool evl = true;
-  while(i<size) {
+
+  u16 i = 0;
+  while(i<size){
     val = in[i];
     r = (u8)val;
     v = (u8)(val>>8);
@@ -29,7 +31,7 @@ void YCbCr(const u32* in, u8* out, const u16 size, const u8 margRB, const u8 tn)
       Cr = r-Y;
       Cb = b-Y;
       evl = ((Cb>=77) && (Cb<=127) && (Cr>=133) && (Cr<=173));
-    } else {
+    }else{
       Cb = -0.148f*r - 0.291f*v + 0.439f*b + 128.0f;
       Cr =  0.439f*r - 0.368f*v - 0.071f*b + 128.0f;
       if(tn == 0) evl = ((Cb>=85) && (Cb<=127) && (Cr>=135) && (Cr<=173)); else
@@ -72,7 +74,7 @@ void medianFilter(const u32* in, u32* out, const u8 xend, const u8 yend){
       p = y*W_+x;
       if(y == 0 || y == H_-1 || x == 0 || x == W_-1){
         out[p] = in[p];
-      } else {
+      }else{
         Y = -1;
         R = V = B = 0;
         while(Y<2){
@@ -111,7 +113,7 @@ void gridEval(u8 *in, const u8 cXsize, const u8 cYsize, const u16 pThresh){
         }
       }
       if(acum>pThresh) s = 0xFF; else s = 0x00;
-      py = y*W_;      
+      py = y*W_;
       while(py<pe){
         in[px+py] = s;
         px ++;
@@ -224,4 +226,3 @@ float evalStdHand(const vec4i sqr){
   if(!dim.x) return 0.0f;
   return (((float)dim.y)/((float)dim.x))*100.0f;
 }
-
